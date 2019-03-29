@@ -8,19 +8,15 @@ var randomBytes = require('randombytes')
 // use unorm until String.prototype.normalize gets better browser support
 var unorm = require('unorm')
 
-var CHINESE_SIMPLIFIED_WORDLIST = require('./wordlists/chinese_simplified.json')
-var CHINESE_TRADITIONAL_WORDLIST = require('./wordlists/chinese_traditional.json')
-var ENGLISH_WORDLIST = require('./wordlists/english.json')
-var FRENCH_WORDLIST = require('./wordlists/french.json')
-var ITALIAN_WORDLIST = require('./wordlists/italian.json')
-var JAPANESE_WORDLIST = require('./wordlists/japanese.json')
-var KOREAN_WORDLIST = require('./wordlists/korean.json')
-var SPANISH_WORDLIST = require('./wordlists/spanish.json')
-var DEFAULT_WORDLIST = ENGLISH_WORDLIST
+var _wordlists = require('./wordlists')
+var wordlists = _wordlists.wordlists
+var DEFAULT_WORDLIST = _wordlists.default
 
 var INVALID_MNEMONIC = 'Invalid mnemonic'
 var INVALID_ENTROPY = 'Invalid entropy'
 var INVALID_CHECKSUM = 'Invalid mnemonic checksum'
+var WORDLIST_REQUIRED = 'A wordlist is required but a default could not be found.\n' +
+  'Please explicitly pass a 2048 word array explicitly.'
 
 function lpad (str, padString, length) {
   while (str.length < length) str = padString + str
@@ -83,6 +79,9 @@ function mnemonicToSeedHexAsync (mnemonic, password) {
 
 function mnemonicToEntropy (mnemonic, wordlist) {
   wordlist = wordlist || DEFAULT_WORDLIST
+  if (!wordlist) {
+    throw new Error(WORDLIST_REQUIRED)
+  }
 
   var words = unorm.nfkd(mnemonic).split(' ')
   if (words.length % 3 !== 0) throw new Error(INVALID_MNEMONIC)
@@ -116,6 +115,9 @@ function mnemonicToEntropy (mnemonic, wordlist) {
 function entropyToMnemonic (entropy, wordlist) {
   if (!Buffer.isBuffer(entropy)) entropy = Buffer.from(entropy, 'hex')
   wordlist = wordlist || DEFAULT_WORDLIST
+  if (!wordlist) {
+    throw new Error(WORDLIST_REQUIRED)
+  }
 
   // 128 <= ENT <= 256
   if (entropy.length < 16) throw new TypeError(INVALID_ENTROPY)
@@ -132,7 +134,9 @@ function entropyToMnemonic (entropy, wordlist) {
     return wordlist[index]
   })
 
-  return wordlist === JAPANESE_WORDLIST ? words.join('\u3000') : words.join(' ')
+  return wordlist[0] === '\u3042\u3044\u3053\u304f\u3057\u3093' // Japanese wordlist
+    ? words.join('\u3000')
+    : words.join(' ')
 }
 
 function generateMnemonic (strength, rng, wordlist) {
@@ -153,6 +157,11 @@ function validateMnemonic (mnemonic, wordlist) {
   return true
 }
 
+function setDefaultWordlist (language) {
+  var result = wordlists[language]
+  if (result) DEFAULT_WORDLIST = result
+}
+
 module.exports = {
   mnemonicToSeed: mnemonicToSeed,
   mnemonicToSeedAsync: mnemonicToSeedAsync,
@@ -162,17 +171,6 @@ module.exports = {
   entropyToMnemonic: entropyToMnemonic,
   generateMnemonic: generateMnemonic,
   validateMnemonic: validateMnemonic,
-  wordlists: {
-    EN: ENGLISH_WORDLIST,
-    JA: JAPANESE_WORDLIST,
-
-    chinese_simplified: CHINESE_SIMPLIFIED_WORDLIST,
-    chinese_traditional: CHINESE_TRADITIONAL_WORDLIST,
-    english: ENGLISH_WORDLIST,
-    french: FRENCH_WORDLIST,
-    italian: ITALIAN_WORDLIST,
-    japanese: JAPANESE_WORDLIST,
-    korean: KOREAN_WORDLIST,
-    spanish: SPANISH_WORDLIST
-  }
+  setDefaultWordlist: setDefaultWordlist,
+  wordlists: wordlists
 }
